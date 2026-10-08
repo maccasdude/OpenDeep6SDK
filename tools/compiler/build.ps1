@@ -13,12 +13,14 @@ $Rev = if ($env:ERICW_REV) { $env:ERICW_REV } else { '36eec1da2a194467e6baac2f44
 if (-not $env:VCPKG_ROOT) { throw 'Set VCPKG_ROOT to your vcpkg folder (https://vcpkg.io).' }
 if (-not (Test-Path $Src)) {
     git clone --recurse-submodules https://github.com/ericwa/ericw-tools.git $Src
+    if ($LASTEXITCODE) { throw 'git clone of ericw-tools failed' }
     Push-Location $Src; git checkout -q $Rev; git submodule update --init --recursive; Pop-Location
+    if ($LASTEXITCODE) { throw "git checkout of $Rev failed" }
 }
 $bf = Join-Path $Src 'common\bspfile.cc'
 if (-not (Select-String -Path $bf -Pattern 'Deep6' -Quiet)) {
     # Deep6 clip hulls (map space, z up), measured from the retail BSPs
-    python - $bf @'
+    $patch = @'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -27,14 +29,22 @@ new = '{{0, 0, 0}, {0, 0, 0}}, {{-32, -32, -2}, {32, 32, 4}}, {{-64, -64, -2}, {
 assert s.count(old) >= 1, 'Quake hull table not found'
 open(p, 'w').write(s.replace(old, new, 1))
 '@
+    # the script goes to python on stdin (an argument would be ignored)
+    $patch | python - $bf
+    if ($LASTEXITCODE) { throw 'patching the Deep6 hulls into bspfile.cc failed' }
 }
 & "$env:VCPKG_ROOT\vcpkg.exe" install tbb:x64-windows embree3:x64-windows
+if ($LASTEXITCODE) { throw 'vcpkg install of tbb / embree3 failed' }
 $Build = Join-Path $Src 'build'
 cmake -S $Src -B $Build -A x64 "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
       -DSKIP_TBB_INSTALL=ON -DSKIP_EMBREE_INSTALL=ON
+if ($LASTEXITCODE) { throw 'cmake configure failed' }
 cmake --build $Build --config Release --target qbsp vis
+if ($LASTEXITCODE) { throw 'cmake build failed' }
 $Bin = Join-Path $Here 'bin'
 New-Item -ItemType Directory -Force -Path $Bin | Out-Null
 Get-ChildItem -Path $Build -Recurse -Include qbsp.exe, vis.exe, *.dll |
     Where-Object { $_.FullName -match '\\Release\\' } | Copy-Item -Destination $Bin -Force
 Write-Host "built: $Bin\qbsp.exe $Bin\vis.exe"
+ 
+
