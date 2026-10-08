@@ -39,7 +39,7 @@ Install Python 3.10+ from python.org, then run `d6edit.bat` (it sets up a
 format tools run with `python formats\...`. Hard-linked working copies
 (`d6mod.py workcopy --link`) need NTFS; elsewhere files are copied.
 The level compiler: `tools\compiler\build.ps1` builds qbsp.exe and
-vis.exe (Visual Studio 2022 + vcpkg); the CI workflow
+vis.exe (Visual Studio 2022; Embree and oneTBB are downloaded); the CI workflow
 (`.github/workflows/ci.yml`) builds them on GitHub's Windows runners too.
 *Test in game* starts the original `deep6.exe` by default; *Play from the
 camera* needs OpenDWWandWExpanded, which runs on Linux only for now. The

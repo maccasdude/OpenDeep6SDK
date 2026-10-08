@@ -5,3 +5,4 @@ tools/compiler/ericw-tools/
 tools/compiler/bin/
 .venv/
 docs/.reference.css
+tools/compiler/deps/

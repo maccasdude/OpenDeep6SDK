@@ -1,5 +1,22 @@
 name: ci
-on: [push, pull_request]
+# push / pull request: tests, plus test builds of the level compiler (qbsp, vis).
+# Publishing a GitHub release (or running this workflow by hand with a tag)
+# also builds the compiler for Linux and Windows and attaches both zips and
+# the reference PDF to that release.
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach the compiler builds to (e.g. v1.0.0); empty = build only'
+        required: false
+
+permissions:
+  contents: write          # needed to upload files to a release
+
 jobs:
   test:
     strategy:
@@ -16,9 +33,35 @@ jobs:
         run: python -m compileall -q formats editor tests
       - name: tests that need no game data
         run: python tests/test_skin_import.py
+
+  compiler-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: build qbsp/vis
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libtbb-dev libembree-dev
+          sh tools/compiler/build.sh
+      - name: package
+        run: |
+          mkdir -p dist/deep6-compiler-linux-x64
+          cp tools/compiler/bin/qbsp tools/compiler/bin/vis dist/deep6-compiler-linux-x64/
+          printf '%s\n' \
+            'qbsp and vis (ericw-tools 2.0 with the Deep6 collision hulls) for OpenDeep6SDK.' \
+            'Put them in OpenDeep6SDK/tools/compiler/bin/.' \
+            'They need the TBB library: sudo apt install libtbb12 libtbbmalloc2' \
+            '(Ubuntu 24.04 / Debian 13; built on Ubuntu 24.04).' \
+            > dist/deep6-compiler-linux-x64/README.txt
+          cd dist && zip -r deep6-compiler-linux-x64.zip deep6-compiler-linux-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deep6-compiler-linux-x64
+          path: dist/deep6-compiler-linux-x64.zip
+          if-no-files-found: error
+
   compiler-windows:
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,12 +70,38 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
       - name: build qbsp/vis
         shell: pwsh
+        run: ./tools/compiler/build.ps1
+      - name: package
+        shell: pwsh
         run: |
-          git clone https://github.com/microsoft/vcpkg $env:RUNNER_TEMP\vcpkg
-          & $env:RUNNER_TEMP\vcpkg\bootstrap-vcpkg.bat
-          $env:VCPKG_ROOT = "$env:RUNNER_TEMP\vcpkg"
-          ./tools/compiler/build.ps1
+          $d = 'dist\deep6-compiler-windows-x64'
+          New-Item -ItemType Directory -Force -Path $d | Out-Null
+          Copy-Item tools\compiler\bin\* $d
+          Set-Content -Path "$d\README.txt" -Value @(
+            'qbsp.exe and vis.exe (ericw-tools 2.0 with the Deep6 collision hulls) for OpenDeep6SDK.',
+            'Put everything in OpenDeep6SDK\tools\compiler\bin\ (the DLLs are Embree and TBB).')
+          Compress-Archive -Path $d -DestinationPath dist\deep6-compiler-windows-x64.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: deep6-compiler-windows
-          path: tools/compiler/bin
+          name: deep6-compiler-windows-x64
+          path: dist/deep6-compiler-windows-x64.zip
+          if-no-files-found: error
+
+  release:
+    needs: [test, compiler-linux, compiler-windows]
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          cp docs/REFERENCE.pdf "dist/Deep6_Engine_and_Format_Reference_${TAG}.pdf"
+          ls -l dist
+          gh release upload "$TAG" dist/*.zip dist/*.pdf --clobber

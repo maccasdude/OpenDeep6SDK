@@ -27,7 +27,8 @@ EOF
 fi
 mkdir -p build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DSKIP_TBB_INSTALL=ON -DSKIP_EMBREE_INSTALL=ON > /dev/null
+cmake .. -DCMAKE_BUILD_TYPE=Release -DSKIP_TBB_INSTALL=ON -DSKIP_EMBREE_INSTALL=ON \
+      -DENABLE_LIGHTPREVIEW=OFF -DDISABLE_TESTS=ON -DDISABLE_DOCS=ON > /dev/null
 make -j"$(nproc)" qbsp vis
 mkdir -p "$HERE/bin"
 cp qbsp/qbsp vis/vis "$HERE/bin/"
