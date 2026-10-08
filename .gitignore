@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.d6edit-tmp
+tools/compiler/ericw-tools/
+tools/compiler/bin/
+.venv/
+docs/.reference.css

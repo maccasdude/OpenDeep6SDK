@@ -1,0 +1,49 @@
+// Deep6 (Wizards & Warriors) entities for TrenchBroom - OpenDeep6SDK
+// Map units = BSP units (1 BSP unit = 16 game world units; one overworld
+// tile = 64 units). Textures look like the shipped levels at scale 0.5.
+
+@SolidClass = worldspawn : "World"
+[
+    worldtype(integer) : "World type (kept as in the shipped levels)" : 0
+    d6ambient(float) : "Ambient light 0-30 added everywhere (retail fit 3.5)" : "3.5"
+    d6lightpeak(float) : "Light at the centre of each light, 0-30 (retail fit 9.6)" : "9.6"
+    d6level(string) : "Level this map was decompiled from (information only)"
+]
+
+@SolidClass = func_door : "Door / moving brush (brush model)"
+[
+    d6type(choices) : "Movement" : 1 =
+    [
+        1 : "Slide along d6axis"
+        2 : "Rotate"
+    ]
+    d6axis(choices) : "Axis (engine axes: 0 x, 1 y = up, 2 z)" : 1 =
+    [
+        0 : "x"
+        1 : "y (up/down)"
+        2 : "z"
+    ]
+    d6maxmove(integer) : "Slide distance in BSP units (signed); for rotating doors the angle" : 128
+    d6rotx(integer) : "Rotation pivot x (engine coordinates, y up)" : 0
+    d6roty(integer) : "Rotation pivot y (engine coordinates, y up)" : 0
+    d6rotz(integer) : "Rotation pivot z (engine coordinates, y up)" : 0
+    d6flags(integer) : "Flags" : 0
+    d6entid(integer) : "Entity id used by event scripts (DOOR = bsp*100000 + id); empty = next free" : 0
+    d6string(string) : "Name shown to the player (max 15 characters)"
+]
+
+@PointClass size(-8 -8 -8, 8 8 8) color(255 255 64) = light : "Point light (.lgt/.rgb, vertex light and lightmaps)"
+[
+    d6light(integer) : "Intensity = radius in BSP units (shipped lights: 180-300)" : 200
+    _color(color255) : "Colour" : "255 255 255"
+]
+
+@PointClass size(-16 -16 -4, 16 16 64) color(64 255 64) = info_player_start : "Editor start point (not used by the game; compile tests use it)"
+[
+    angle(integer) : "Facing" : 0
+]
+
+@PointClass size(-8 -8 -8, 8 8 8) color(128 128 128) = d6_comment : "Note (ignored by the compiler)"
+[
+    message(string) : "Text"
+]

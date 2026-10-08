@@ -1,0 +1,38 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install numpy Pillow scipy
+      - name: byte-compile everything
+        run: python -m compileall -q formats editor tests
+      - name: tests that need no game data
+        run: python tests/test_skin_import.py
+  compiler-windows:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: build qbsp/vis
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg $env:RUNNER_TEMP\vcpkg
+          & $env:RUNNER_TEMP\vcpkg\bootstrap-vcpkg.bat
+          $env:VCPKG_ROOT = "$env:RUNNER_TEMP\vcpkg"
+          ./tools/compiler/build.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deep6-compiler-windows
+          path: tools/compiler/bin
