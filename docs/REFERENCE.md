@@ -2,7 +2,7 @@
 
 **Wizards & Warriors (Heuristic Park, 2000) - deep6.exe**
 
-OpenDeep6SDK v1.0.0, compiled 2026-10-08 from the SDK documentation.
+OpenDeep6SDK v1.1.0, compiled 2026-10-09 from the SDK documentation.
 
 Everything here was found by reverse engineering the GOG release of the game (build 1266995554): reading the executable with its Watcom symbols, running it and round-tripping every data file. It is meant to be enough to write your own tools for the game; the Python modules in `formats/` are working references for every format. No game data is included.
 
@@ -19,7 +19,9 @@ Everything here was found by reverse engineering the GOG release of the game (bu
 * [Chapter 9. Sound, music, speech and the journal](#chapter-9-sound-music-speech-and-the-journal) (`docs/formats/audio.md`)
 * [Chapter 10. NPC and guildmaster dialogue (NPCDATA.PAK, GMDATA.PAK)](#chapter-10-npc-and-guildmaster-dialogue-npcdatapak-gmdatapak) (`docs/formats/npc.md`)
 * [Chapter 11. Deep6 area transitions ("exits")](#chapter-11-deep6-area-transitions-exits) (`docs/formats/exits.md`)
-* [Chapter 12. Level geometry: TrenchBroom -> Deep6](#chapter-12-level-geometry-trenchbroom---deep6) (`docs/geometry.md`)
+* [Chapter 12. Save games and the character roster](#chapter-12-save-games-and-the-character-roster) (`docs/formats/saves.md`)
+* [Chapter 13. Fonts, pointers, palettes and other small files](#chapter-13-fonts-pointers-palettes-and-other-small-files) (`docs/formats/ui.md`)
+* [Chapter 14. Level geometry: TrenchBroom -> Deep6](#chapter-14-level-geometry-trenchbroom---deep6) (`docs/geometry.md`)
 * [Appendix A. deep6.exe modules](#appendix-a-deep6exe-modules) (`docs/exe_modules.md`)
 * [Appendix B. In-game verification log](#appendix-b-in-game-verification-log) (`docs/verification.md`)
 
@@ -221,14 +223,19 @@ not see the edits.
 
 ## 5. Saves and runtime state
 
-* `save/` - the save slots (`game00.sav` ...). Their header resembles
-  `D6ARCHIV.DAT` (version 0x140) but was not decoded; the PC position is
-  stored twice (x, y, z floats; the second copy has y + 832).
+* `save/` - the save slots (`game00.sav` ...): a 0x54-byte header (version
+  0x140, part offsets), description, date, roster lines, a 136 x 111
+  thumbnail, two archives in the `D6ARCHIV.DAT` layout (the spoke cache and
+  the runtime state), the party state and one block per member (character
+  record, attachments, position, spell memory, monster state). Fully
+  decoded in `saves.md`; read, edited and rebuilt by `formats/d6save.py`
+  (an edited save was loaded in the game).
 * `D6ARCHIV.DAT` - archive of the whole runtime state (header of 173 u32:
   version, flags, offsets and sizes of `ROSTER`, `D6WORLD`, each
   `D6SEGnn.GAM`, the journals and 24 shop files). Decoded for listing and
   extraction (`data.md` section 7).
-* `D6WORLD.DAT` - world states; `ROSTER.DAT` - the party;
+* `D6WORLD.DAT` - world states; `ROSTER.DAT` - characters at the inn
+  (15 slots of the 0x27F8-byte character record, `saves.md` section 5);
   `D6SEGnn.GAM` - per-spoke objects (positions, health, opened chests).
 * Guildmaster flags are **not** saved: they reset on every visit.
 
@@ -349,10 +356,11 @@ Collected from the chapters (details there):
 
 * The `.ldl` files (launcher strings, XOR-encrypted, key not recovered; the
   game does not read them).
-* Save slot files (`save/game*.sav`): header not decoded.
-* Fonts (`.FNT`, `Font_Load_` font.c) and pointer files (`.ptr`, text, loaded
-  by `LoadPointers_` lmouse.c): loaders known, layouts not decoded.
-* A few database fields (`databases.md` section 11), terrain header floats
+* `Town000.hub` (not loaded by the exe; partial layout in `ui.md`).
+* Many fields of the 0x27F8-byte character record (`saves.md` section 6) and
+  parts of the save member block marked M there.
+* A few database fields (`databases.md` section 11; watchpoints show the
+  open monster fields are not read in the game), terrain header floats
   and some tile bytes (`terrain.md`), two NPC opcodes (`npc.md`), part
   header words in models (`models.md` section 5).
 * Effects hard-coded per spell id (damage, visuals and sounds are code, not
@@ -370,7 +378,7 @@ Collected from the chapters (details there):
 | `EVENTS.DCL`, `EVENTS.COD` | 2 | event script | data |
 | `NPCDATA.PAK`, `GMDATA.PAK` | 2 | dialogue bytecode | npc |
 | `D6STRING.DAT`, `TEXTPAK.000` | 2 | strings, messages | data |
-| `pctalk/TALKPAK.000-009` | 10 | PC remarks ("On my way...") per voice; same layout as TEXTPAK (u32 n, n x {i32 id, u32 offset, u32 size}, NUL strings) (H for layout) | this appendix |
+| `pctalk/TALKPAK.000-009` | 10 | PC remarks ("On my way...") per clan (record +0x1A); same layout as TEXTPAK (u32 n, n x {i32 id, u32 offset, u32 size}, NUL strings) | ui |
 | `*.bsp .twd .lf .lfs .ls .lss .lgt .rgb .nvs .l2n` | 66 each | indoor levels | levels |
 | `*.BOL` | 53 | objects per level | levels, data |
 | `.tc .pt1 .pt2` | 6 | tool output, not read | levels |
@@ -382,23 +390,23 @@ Collected from the chapters (details there):
 | `models/**/*.mdl` | 728 | models | models |
 | `models/pc/*.seq` | 33 | build-time frame lists for pcreduce.exe, not read by the game | models |
 | `models/*.lst`, `models/monster/model.lst` | 6 | model lists (only chardemo reads model.lst) | data, models |
-| `models/monster/*.bsp` | 6 | catapult, minecart, warship, raft, horse, hydra: not examined | - |
+| `models/monster/*.bsp` | 6 | version-28 BSPs; warship and raft are loaded by the exe (vehicle collision), the other four are not | ui |
 | `emitters.dat`, `efxgfx/*.ant .alf .p16 .bmp`, `gfx/` | | particles, animated textures, glows | effects |
 | `itemicon/`, `I99Icon/`, `dragicon/`, `roleicon/`, `portrait/` | | interface bitmaps (item icons: 246 in the exe table) | databases |
-| `D6FNT*.FNT` + `D6FNT*.P16` | 51 + 33 | fonts and their palettes (`Font_Load_`, `Font_LoadPal16_`) | not decoded |
+| `D6FNT*.FNT` + `D6FNT*.P16` | 51 + 33 | fonts and their palettes (`Font_Load_`, `Font_LoadPal16_`); 17 loaded | ui |
 | `palmdrop palmsand ptopdrop treedirt treedrop ttopdrop .p16` | 6 | backdrop palettes | terrain |
-| `*.ptr` + bitmaps | 32 | mouse pointers: text with the bitmap name, sizes, hot spot and per-frame "index time" lines (M) | not decoded |
-| `DEEP6.PAL` | 1 | 8960 bytes = 768-byte RGB palette + 8192 bytes (32 x 256) (M) | not decoded |
+| `*.ptr` + bitmaps | 32 | mouse pointers: text with the bitmap name, hot spot, frame size and per-step "frame time" lines; 23 loaded | ui |
+| `DEEP6.PAL` | 1 | 8960 bytes = 768-byte RGB palette + 8192-byte (32 x 256) table for the span routine | ui |
 | `MONSOUND.DAT`, `sounds/` | | sound effect table and wavs | audio |
 | `Speech/*/*.wav` | 5954 | spoken lines: NPCs, narrator (479 in 000-1611WAV), Gareth (27 in k21) | audio |
 | `music/*.mp3` | 8 | music (Miles MP3) | audio |
 | `speech.tag`, `music/MUSIC.TAG`, `Speech/SPEECH.DIR` | 3 | small text tag files (CD-era data location markers) (L) | - |
 | `JOURNAL.nnn` | | journal pages (runtime) | audio |
 | `townavi/townhubN.avi`, `townmskN.avi` | | town hub pans (MS Video 1) and click masks (uncompressed DIB) | terrain |
-| `Town000.hub` | 1 | not opened by deep6.exe (no file name string) | - |
+| `Town000.hub` | 1 | not opened by deep6.exe (no file name string) | ui |
 | `movie/*.bik` | 2 | Bink movies | - |
 | `*.ldl` | 4 | launcher strings, encrypted, not read by the game | data |
-| `D6ARCHIV.DAT`, `D6WORLD.DAT`, `ROSTER.DAT`, `D6SEGnn.GAM`, `PCSNAP.nnn`, `save/` | | runtime state (section 5) | data |
+| `D6ARCHIV.DAT`, `D6WORLD.DAT`, `ROSTER.DAT`, `D6SEGnn.GAM`, `PCSNAP.nnn`, `save/` | | runtime state (section 5) | data, saves |
 | `gameopt.dat`, `*.kbd` | | options, key bindings (runtime) | - |
 
 # Chapter 2. Deep6 indoor level formats (Wizards & Warriors, 2000)
@@ -476,6 +484,9 @@ again.
 
 Leaf contents (H, from `InBspWater_`): -1 empty, -2 solid, -3 water, -5 lava
 (-4 slime and -6 sky are Quake values not seen in use).
+`AdjustBspNavPnts_` flags nav points in water (0x04) and lava (0x04 | 0x02).
+Lava is not solid: in a test the PC walked through a lava pool without
+losing hit points, and the party moved out of it on its own (M).
 
 Texinfo (`bsp_3DCard_PolyDraw_`, `d_span.c`, `Texlist_AssignFaceTex_`):
 * Texture coordinate (H): `u = ((P - origin) . s.xyz + s.w * 0.25) / 32` gives
@@ -1855,7 +1866,7 @@ Loader: `LoadItems_` (deep6.c) reads the u32 count (error if > 999) and then **a
 records into `_Item[1..count]` at startup. Display: `ItemBoxText_` (pcinvent.c) is the
 best single reference - it prints most fields with D6STRING format strings 2701..2813.
 
-An *inventory instance* (0x56 bytes, PC inventory at pc+0x296, 78 slots) is created by
+An *inventory instance* (0x56 bytes, PC inventory at pc+0x298, 78 slots) is created by
 `ItemToInv_` (townsmit.c) from the record: `+0 i16 item, +2 i16 durability (DiceRoll of
 durdice, or max for shop items), +4 u8 flags (1 ?, 2 cursed, 4 identified, 8 ?, 0x10
 invoked), +6 i32 charges/quantity, +0xA name, +0x20 spell, +0x22 damage[3], +0x2E
@@ -2280,8 +2291,13 @@ PCMLoadModel_ 0x4FBDDA..0x4FBE02, PCMChangeModel_ 0x4FC029..0x4FC051, PrintModel
 ## 11. Open questions / low confidence
 
 * Monster fields marked low (0x22, 0x26, 0x78, 0x8C, 0x11A, 0x120, 0x12C) have values in
-  the data but no reader was found in the decompile (they may be editor-only or read
-  through the copied runtime struct).
+  the data but no reader was found in the decompile. `InitMONSToMonster_` reads the
+  record only at 0x18, 0x28, 0x2C (16 bytes), 0x34, 0x4C (32 bytes), 0x68, 0x7A, 0x7C,
+  0x7E, 0x9C, 0xFC, 0x128, 0x131, 0x132. Hardware read watchpoints on the Crypt
+  Skeleton record in the running game (two runs, about 45 s of melee each) saw no
+  read of any of these fields, nor of item field 0x96 on the Rusted War Axe record.
+  They are most likely editor-only data (medium confidence): changing them should
+  have no effect in the game.
 * Exact meaning of several flag bits (MonsRec flags130/131/132, ItemRec atkflags/
   atkflags2, flags98 0x0080/0x4000/0x8000) is inferred from the tests and the records
   that set them.
@@ -3755,7 +3771,283 @@ arrival point and the records involved.
   Event operands are indexes into the trigger's parameters; d6exits resolves
   them. It still follows CALLEVENT, SETSTATE and SETSWITCH chains to depth 4.
 
-# Chapter 12. Level geometry: TrenchBroom -> Deep6
+# Chapter 12. Save games and the character roster
+
+*Source: `docs/formats/saves.md`*
+
+Save slots (`save/gameNN.sav`), the inn roster (`ROSTER.DAT`) and the
+character record they share. Reference implementation: `formats/d6save.py`
+(read, write, edit, thumbnail, archive extraction, `--selftest`).
+
+Sources: `SaveCurrentGame_` 0x526F08, `RestoreCurrentGame_` 0x527D68,
+`SegWrite_ReadSaveGameIHDI_` 0x5260D8 (load screen), `WriteFountainTimers_`,
+`RObj_Write_` (rotobj.c), `OpenRoster_`, `LoadRoster_`, `LoadPC_`, `SavePC_`
+(pccreate.c). H unless marked.
+
+    python3 formats/d6save.py info  save/game00.sav
+    python3 formats/d6save.py set   save/game00.sav out.sav pc0.gold=5000 pc0.strength=25 pc0.name=Redux
+    python3 formats/d6save.py thumb save/game00.sav thumb.png
+    python3 formats/d6save.py extract save/game00.sav OUTDIR
+    python3 formats/d6save.py --selftest GAMEDIR
+
+Checked in the game: a save edited with `set` (name, gold, strength) loads,
+the new name shows on the party panel and the values are in the character
+record in memory.
+
+## 1. Files
+
+* `save/SAVEGAME.DIR` - 14 bytes of text, `SAVEGAME.DIR` + CRLF: a marker.
+* `save/gameNN.sav` - one per slot, below.
+* `ROSTER.DAT` - characters waiting at the inn (section 5).
+* While saving, the game writes `SAVEARCH.$$$` (the runtime archive) and
+  deletes it; while loading, `RESTARCH.$$$`.
+
+## 2. gameNN.sav layout
+
+All integers little-endian. Header, 0x54 bytes = 21 u32 (`_SavegameHeader`):
+
+| u32 | meaning |
+|---|---|
+| 0 | version, must be 0x140 |
+| 1 | `_gPartyWarshipFlag` |
+| 2 | `_gGMUniqueBits` (guildmaster unique bits, GM op SETUBIT) |
+| 3 | offset of the description (always 0x54) |
+| 4 | offset of the party state (section 3) |
+| 5, 6 | offset, size of the copy of `D6ARCHIV.DAT` at save time |
+| 7, 8 | offset, size of the runtime archive (`SaveArchive_`) |
+| 9..14 | per party slot 0..5: 1 = member block present |
+| 15..20 | per party slot: offset of the member block (section 4) |
+
+The game writes the parts in this order, and `d6save` keeps it:
+
+| part | size | content |
+|---|---|---|
+| header | 0x54 | above (rewritten at the end with the offsets) |
+| description | 0x50 | text typed on the save screen |
+| info | 0x40 | date string (`SR_MakeDateString_`), e.g. `October  2, 2026   1:29 PM` |
+| party count | 4 | i32 n |
+| roster lines | n x 32 | per member: name char[16], status text char[16] (`_statusstr`) |
+| thumbnail | 0x75F0 | 136 x 111 pixels, 16 bits each, copied from the screen canvas at (392, 8) (the right part of the 3D view) in the screen's pixel format (RGB565 on current systems, M) |
+| archive copy | header 6 | `D6ARCHIV.DAT` as it was: the cache of visited spokes |
+| runtime archive | header 8 | `SaveArchive_` output: D6WORLD, D6SEGnn.GAM, journals, fog/markers, ROSTER, shop files (`data.md` section 7) |
+| party state | | section 3 |
+| member blocks | | section 4, one per present member |
+
+Loading: the runtime archive is unpacked into the game folder
+(`RestoreArchive_`), the archive copy becomes `D6ARCHIV.DAT`, then the party
+state and members are read and the spoke is entered. Both archives use the
+D6ARCHIV layout and are listed / extracted by `d6data.py --list/--extract`.
+
+## 3. Party state
+
+Fixed sizes, in this order (names are the exe's globals):
+
+| field | size | field | size |
+|---|---|---|---|
+| `_gSpokeNumber` | 4 | `_gPCCamFlag` | 4 |
+| `_gPartyN` | 4 | `_gBallGlow` | 0x12 |
+| `_gPartyI` | 0x18 | `_gBallGlowON` | 0x12 |
+| `_gPartyS` | 0x18 | `_gPCTorchLight` | 0x18 |
+| `_gPartyU` | 0x18 | `_gPCTorchBrite` | 0x18 |
+| `_gPartyF` | 0x18 | `_gPCSpellLight` | 0x18 |
+| `_gBannerLeader` | 0x18 | `_gPCSpellBrite` | 0x18 |
+| `_gPCCombatID` | 0x18 | `_gPCSpiritEye` | 0x18 |
+| `_gPCNextOrder` | 0x18 | `_gPCInspectBits` | 0x18 |
+| `_gPCReadyMode` | 0x18 | `_gPCInspectTrap` | 0x18 |
+| `_gPCReadyData` | 0x18 | `_gWorldClockTime` | 4 |
+| `_gPCReadyTarg` | 0x18 | `_gNpcStopTime` | 4 |
+| `_gPCLatchProp` | 0x18 | `_gNpcStatus` | 0x140 |
+| `_gPCExpAcc` | 0x18 | `_gNpcMBits` | 0x280 |
+| `_PCFollow` | 0x18 | `_WState` | 0x1000 (16 spokes x 256 world states) |
+| `_gPCidx` | 4 | `_gPortalFlag` | 0x40 |
+| `_gPCaop` | 4 | `_gPortalBase` | 0xC0 |
+| `_gCamMan` | 4 | `_gPortalHRet` | 0x18 |
+| `_PCCamRotation` | 0x48 | `_gPortalHome` | 0x48 |
+
+Then the fountain timers: i32 count (must equal the number of fountains the
+game knows, else "FOUNTAIN COUNT" error), count x 0x18 bytes.
+
+## 4. Member block
+
+`mon` is the member's runtime monster record (`_gMonster`, 0x2A8 bytes).
+
+| part | size | content |
+|---|---|---|
+| pc | 0x27F8 | character record (section 6) |
+| attach_items | 0x38 | i16[28] item at each attachment point |
+| attach_has_ext | 0x1C | u8[28]: 1 = an object extension follows |
+| extensions | n x 0xA8 | one per flagged attachment (`ObjExt`) |
+| pos | 0xC | f32 x, y, z world position (`mon+0x10`) |
+| rot | 0xC | `mon+0x1C` |
+| | 4 | `mon+0x0C` |
+| | 4 | u32 = byte at the model object +0x7D |
+| | 0xC | `mon+0xBC` |
+| spell memory | 0x14 | `_gPCSpellMemory[pc]` |
+| vampire boon | 4 | `_gPCVampireBoon[pc]` |
+| spec-op mode | 4 | `_gPCSpecOpMode[pc]` |
+| netman | 0x12E | `LoadManToNetMan_`: the monster state in its network form (hit points ...), M |
+| pos2 | 0xC | `mon+0x50`, a second position (y + 832) |
+| | 8 x 4 | `mon+0x5C`, `+0xE4` .. `+0xFC` |
+| | 1, 2 | `mon+0x272`, `mon+0x274` |
+| mount | 2 | i16 `mon+0x276`, -1 = none; else a 0x12-byte `_gPCMount` record follows |
+| | 2, 1, 4 | `mon+0x270`, model +0x7C, model +0x78 |
+| | 0xC, 4 | `mon+0x25C`, `mon+0x268` |
+| has_robj | 4 | u32 1 = a rotating-object record follows: u32 flags; if flags & 2: u32, 0x1C, u32, 0x1C, u32, 0x1C, u32 |
+
+## 5. ROSTER.DAT
+
+| offset | content |
+|---|---|
+| 0x00 | u32 offset[15]: file offset of each roster slot, 0 = empty |
+| 0x3C | u32 value[15]: third argument of `SavePC_` per slot (meaning not known, M) |
+| 0x78 + i x 0x27F8 | character record of slot i (section 6) |
+
+## 6. Character record (0x27F8 bytes, `_pc[6]`)
+
+The same record is used for the party (`_pc`, 0x6500F0), the local party in
+towns (`_lpc`, 0x65F220), the roster and saves. Fields found so far (the
+rest is carried as raw bytes). Name lists are the game's own strings.
+
+| offset | type | field | values / notes |
+|---|---|---|---|
+| 0x08 | char[16] | name | |
+| 0x18 | i16 | gender | 0 Male, 1 Female (GM GENDER) |
+| 0x1A | i16 | clan | 0 Human, 1 Elf, 2 Dwarf, 3 Gnome, 4 Pixie, 5 Omphaaz, 6 Whiskah, 7 Gourk, 8 Ratling, 9 Lizzord (GM CLAN) |
+| 0x1C | i16 | role | 0 Warrior, 1 Wizard, 2 Priest, 3 Rogue, 4 Ranger, 5 Bard, 6 Samurai, 7 Paladin, 8 Barbarian, 9 Monk, 10 Ninja, 11 Warlock (GM ROLE) |
+| 0x1E | i16[8] | abilities | Strength, Intellect, Spirituality, Dexterity, Agility, Fortitude, Will, Presence (`PCDrawAbil_`) |
+| 0x4E | i16[16] | resistances | Magic, Fire, Mind, Paralysis, Death, Petrification, Cold, Wind, Earth, Poison, Elements, Dispel, Silence, Light, Charm, Mavin (`PCStatDisplay_`) |
+| 0xF2 | i16 | alignment | 0..100 (GM ALIGNMENT) |
+| 0x108 | u32 | gold | (GM / NPC GOLD) |
+| 0x110 | u32 | experience | (`AwardExp_`) |
+| 0x118 | i16 | level | (`PCLevelUp_`) |
+| 0x11C | i16 | hit | shown as hit - 10 |
+| 0x120 | i16 | parry | |
+| 0x124 | i16 | shield | |
+| 0x128 | i32 | armor | `DrawStatAC_` |
+| 0x12C | i32 | speed delay | shown as (3000 - value) / 100 |
+| 0x19C | i16 | status | 0 OK, 1 STONE, 2 INANIMATE, 3 DEAD, 4 BONES, 5 ASH, 6 LOST |
+| 0x1A0..0x1D4 | | afflictions | `SetAffli_`, `CureMonster_`, `PoisonMonster_` (M) |
+| 0x1E4 | i16[6] | | spell school entries tested by the spell book (M) |
+| 0x298 | 78 x 0x56 | inventory | item instances: +0 i16 item record, +2 i16 durability, +4 u8 flags (2 cursed, 4 identified, 0x10 invoked), +6 i32 charges / quantity, +0xA name ... (`databases.md`) |
+| 0x1CCA.. | | equipped weapon / quiver slots | (`ExecFight_`, `PCReQuiver_`, M) |
+| 0x1CE6 | u8[256] | quest flags | (NPC QFLAG) |
+| 0x1DE6 | i8[160] | attitude per NPC | (NPC ATTITUDE) |
+| 0x1EA8 | u32[160] | NPC script register per NPC | (NPC PCREG) |
+| 0x2758 | | party group / link | (`PCPartyGroup_`, `SplitTheParty_`, M) |
+| 0x2760, 0x2762 | i16 | polymorph state | (`ReversePolymorph_`, M) |
+| 0x2784 | u32 | kills | |
+| 0x2790 | u32 | assists | |
+
+Hit points and mana are kept in the runtime monster record, so in a save
+they are part of the member block (`netman`), not of the character record.
+
+# Chapter 13. Fonts, pointers, palettes and other small files
+
+*Source: `docs/formats/ui.md`*
+
+The interface files and the remaining small files of the game folder.
+Reference implementations: `formats/d6font.py` (fonts), `formats/d6ui.py`
+(pointers, DEEP6.PAL), `d6data.TextPak` (TALKPAK), `d6level.BSPFile`
+(vehicle BSPs). H unless marked.
+
+## 1. Fonts: D6FNTnn.FNT (+ D6FNTnn.P16)
+
+`Font_Load_`, `Font_DrawChar_`, `Font_StrWidth_` (font.c), `LoadFonts_`
+(deep6.c). All 51 files round-trip (`d6font.py --selftest`).
+
+| offset | type | field |
+|---|---|---|
+| 0x00 | u16 | cell width (largest glyph) |
+| 0x02 | u16 | height |
+| 0x04 | u16 | mode: 0 one colour, 1 palette colours |
+| 0x06 | u16 | glyph count (always 128, ASCII 0..127) |
+| 0x08 | i16 | spacing added after each glyph (0, -1, -2, -3, 1) |
+| 0x0A | u16 | 0 |
+| 0x0C | u16 | bytes per glyph = 2 + cell width x height |
+| 0x0E | | glyph c at 0x0E + c x glyph size: u16 width, then height rows of *width* pixels (packed at the glyph's own width, padded to the glyph size) |
+
+Pixels: 0 is transparent. Mode 0: 1 is the text colour, the other small
+values are the background and shadow colours set by the caller
+(`_gFGColor`, `_gBGColor`, `_gSGColor`). Mode 1: an index into the font's
+own palette, `D6FNTnn.P16` (32 shade rows x 256 RGB565, `Font_LoadPal16_`).
+
+The game loads 17 fonts (`LoadFonts_`, slot: file): 0 D6FNT01, 1 D6FNT03,
+2 D6FNT54, 3 D6FNT40, 4 D6FNT49, 5 D6FNT42, 6 D6FNT58 (the gothic dialogue
+font of the message bar), 7 D6FNT50, 8 D6FNT47, 9 D6FNT56, 10 D6FNT48,
+11 D6FNT53, 12 D6FNT57, 13 D6FNT52, 14 D6FNT43, 15 D6FNT26, 16 D6FNT14.
+Slots 5..16 are colour fonts with the .P16 of the same name. The other
+font files are not loaded.
+
+    python3 formats/d6font.py sheet D6FNT58.FNT sheet.png d6fnt58.p16
+    python3 formats/d6font.py text  D6FNT01.FNT "On my way..." out.png
+
+## 2. Mouse pointers: *.ptr
+
+`LoadPointers_` (lmouse.c) loads 23 pointers (hourglas, vxpoint, vxfight,
+vxsorcer, vxuse, vxdrag, vxthief, vxtalk, vxgive, mptritem, vtarget,
+vblutarg, vnotarg, vnobtarg, vxlook, vxwalk, vxwing, vxbreath, vxgaze,
+vxvamp, vxhide, vxcurse, vxfly); `CreateMousePointer_` (mousetim.c) reads
+them with fscanf. Text, one value per line (CRLF):
+
+    vtarget.bmp      bitmap (8-bit BMP; frames side by side)
+    14               hot spot x  (reset to 0 when outside the frame)
+    14               hot spot y
+    8                frame count
+    30               frame width  (at most 128)
+    30               frame height (at most 128)
+    8                sequence length (at most 16)
+    0 60             then per step: frame index, time in ms (10..1000, else 100)
+    1 60
+    ...
+
+The bitmap must be at least frame count x frame width wide and frame height
+high, or the pointer is not created.
+
+## 3. DEEP6.PAL
+
+`Palette_Load_` (palette.c) reads 0x2300 bytes (the file is 8960 bytes):
+
+| offset | size | content |
+|---|---|---|
+| 0 | 768 | 256 RGB entries, the game's default palette; `Pal16_Calculate_` turns it into the 32-row 16-bit shade table `_gDefaultPal16` (row r = rgb x (r + 1) / 32) |
+| 0x300 | 8192 | 32 rows x 256 bytes, a lookup table used by the asm span routine `myscan.ASM` (`_gPalette + 0x300 + row x 0x100`), M |
+
+## 4. PC remarks: pctalk/TALKPAK.000-009
+
+`LoadPCTalkMessages_` (pctalk.c) opens `pctalk/TALKPAK.%03d` with the
+character's **clan** (record +0x1A), so each of the ten clans has its own
+remarks ("Ready", "Help me!", "On my way...", "$ taken", "Giddy-Up!" ...;
+`$` is replaced by a name). Same layout as TEXTPAK.000: u32 count, count x
+{i32 id, u32 offset, u32 size}, NUL-terminated strings; read and written by
+`d6data.TextPak` (10/10 round trip).
+
+## 5. Vehicle BSPs: models/monster/*.bsp
+
+Ordinary version-28 BSP files (`d6level.BSPFile`, 6/6 round trip; two of
+them keep 2 non-zero padding bytes after the last lump and all record the
+offset of the empty visibility lump, which the reader preserves).
+
+| file | faces | loaded by deep6.exe |
+|---|---|---|
+| warship.bsp | 318 | yes, `models/monster/WARSHIP.BSP` (the ship; "Unable To Load" message) |
+| raft.bsp | 140 | yes, `models/monster/RAFT.BSP` |
+| catapult.bsp, hydra.bsp | 14, 10 | no file name string in the exe |
+| horse.bsp, minecart.bsp | 6 (a box) | no file name string in the exe |
+
+They are collision / walk-on geometry for the vehicle models of the same
+name (warship.mdl, raft ...), M.
+
+## 6. Other files
+
+| file | content |
+|---|---|
+| `speech.tag`, `music/MUSIC.TAG` | text marker files ("Speech Tag File" ...): mark where the data folders are (CD era), L |
+| `Speech/SPEECH.DIR`, `save/SAVEGAME.DIR` | text markers (`SPEECH`, `SAVEGAME.DIR`) |
+| `Town000.hub` | 3264 bytes; no file name string in deep6.exe, so not loaded. Starts with u32 0xCC, 0x1E0, 0x1E0, 0, then 16-byte records (u16, u16 2, u32 offset, u32 0, u32 1), L |
+| `*.ldl` | launcher strings, XOR-encrypted with a fixed per-position key (not recovered); not read by deep6.exe (`data.md` section 6) |
+| `default.kbd`, `autoexec.kbd`, `master.kbd` | key bindings (runtime) |
+
+# Chapter 14. Level geometry: TrenchBroom -> Deep6
 
 *Source: `docs/geometry.md`*
 
@@ -3905,8 +4197,9 @@ luxels (larger faces are not drawn; the compiler warns).
   a new light dragged in from the entity browser (it carries only an origin;
   the compiler uses the FGD defaults); compiled and installed from the editor,
   all of it shows in the game. File > New gives the template room, which
-  compiles. Not checked in TrenchBroom itself: lava and clip flags (same path
-  as water), TrenchBroom on Windows/macOS.
+  compiles. Lava and clip brushes (content flags, same path as water) were
+  checked in the game from a map written by script; TrenchBroom on
+  Windows/macOS was not tried.
 
 # Appendix A. deep6.exe modules
 
@@ -4162,6 +4455,11 @@ format docs carry the details; this page is the overview.
 | Spoke change with BSP rebase (d6exits) | spoke 8 exit T3 (lever W1, party in box B2) to spoke 11 | PC moved by (157696, 13056, -34816) = origin 11/3 - origin 8/1 - (0, 256, 0), exactly as documented |
 | TrenchBroom 2026.2 editing | CRYPTA start corridor: wall retextured in the material browser, water volume (texture + content flag), light recoloured, new light from the entity browser; compile + install | skull wall, water surface and red light seen in the game (before/after screenshots); File > New template compiles |
 | TrenchBroom 2026.2 round trip | editor: set up project, decompile TCRYPT, open in TrenchBroom (AppImage), duplicate a roof beam 512 units up, save in TrenchBroom, compile + install from the editor | configuration loads (after fixes), map opens with the right game, compiled level contains the beam, game loads it; the beam itself not seen in the game (night, forest) |
+| Guildmaster buttons (Valeia Town Hall, Armory) | news, bank, employment (with its reply list), done/exit; buying in Smitty's armory | each runs its script handler (news text, "taking deposits", job offer, Bounty -> "The job is yours"); dagger bought, gold 200 -> 150, shop line spoken |
+| Lava and clip brushes (d6bspc) | CRYPTA start corridor: a lava pool (content flag lava, `_special/lava`) and a clip wall (`_special/clip`) added to the decompiled map, compiled, installed | lava compiles to leaf contents -5 and is drawn with the animated lava texture; the PC walks through it (no damage seen in 12 s; the party drifts out of the pool on its own); the clip wall is invisible and stops the PC at the brush face + 32 (hull 1) |
+| Animated effect textures (efxgfx `.ant`) | `torch-wood.ant` shade table with red and blue swapped | the wall torches burn blue |
+| Save editing (d6save) | game00.sav edited with `set`: name Redux, gold 5000, strength 25; loaded with --load-slot | loads; new name on the party panel; gold and strength in the character record in memory |
+| Unused database fields | hardware read watchpoints on the Crypt Skeleton record (+0x22, 0x26, 0x78, 0x8C, 0x8E, 0x11A, 0x120, 0x12C) and Rusted War Axe item +0x96 during melee | no reads: record fields are copied at spawn only, these not at all |
 | Party entry placement trig (d6exits) | save position against the formula | z 83453.9609375 matches the exe's sin/cos(i*6.28/1024) tables (2 pi gives 83456) |
 
 ## Checked against the retail data
@@ -4171,18 +4469,22 @@ format docs carry the details; this page is the overview.
 | Lightmap extents (smin, tmin, w, h) | all faces of crypta and minesb from the retail BSPs | 21743/21743 equal |
 | Light model | retail BSP + lights relit, every luxel against the retail .ls | RMS error 5.7 (crypta) and 4.0 (minesb, not used for the fit) of 30; old defaults 16 and 18 |
 | Vertex light / leaf object light | same, against the retail BSP lumps | own fit (ambient + 12.4, peak x 0.43): vertex RMS 7.1 / 8.5 (was 10.2), leaf light 4.4 / 7.1 |
+| Save slots and ROSTER.DAT (d6save) | parse and rebuild | byte identical |
+| Fonts (d6font), pointers + DEEP6.PAL (d6ui) | parse and rebuild all files | 51/51, 33/33 identical |
+| Vehicle BSPs (models/monster/*.bsp) | added to the d6level self test | 6/6 identical (end padding, empty-lump offset kept) |
 | `InBSPArea_` / spoke BSP lookup in d6exits | terrain leaf tree (TerBSP_Calculate_) ported; 39000 random positions (terrain and dungeon spokes) against the exe rules | 0 mismatches |
 
 ## Not yet checked in the game
 
 * Skinned glTF from a real Blender export.
-* Spell table numbers (mana, levels, recovery: needs a caster; the game maps
-  the patched exe, so the bytes arrive). The spellbook pages need magic skill.
+* Spell table numbers (mana, levels, recovery: needs a caster with magic
+  skill; the test warrior's Magic button does nothing. The game maps the
+  patched exe, so the bytes arrive).
 * Hearing sounds/music (the test setup has no audio device; file opens can
   be traced).
-* emitters.dat / .ant / .alf edits (the files are loaded at start, traced;
-  the look was not checked: no torch or candle near the test position).
-* Guildmaster buttons other than Leave (news, bank, shop results).
+* emitters.dat and .alf edits in the game (the files are loaded at start,
+  traced; `.ant` edits were checked, see above).
+* Lava damage (none seen; whether the engine hurts a party in lava is not known).
 * Rotating door pivot keys.
 
 ## Notes for testing

@@ -146,5 +146,6 @@ luxels (larger faces are not drawn; the compiler warns).
   a new light dragged in from the entity browser (it carries only an origin;
   the compiler uses the FGD defaults); compiled and installed from the editor,
   all of it shows in the game. File > New gives the template room, which
-  compiles. Not checked in TrenchBroom itself: lava and clip flags (same path
-  as water), TrenchBroom on Windows/macOS.
+  compiles. Lava and clip brushes (content flags, same path as water) were
+  checked in the game from a map written by script; TrenchBroom on
+  Windows/macOS was not tried.

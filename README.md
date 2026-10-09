@@ -1,4 +1,4 @@
-# OpenDeep6SDK v1.0.0
+# OpenDeep6SDK v1.1.0
 
 Modding tools for **Wizards & Warriors** (Heuristic Park, 2000) and its Deep6
 engine. The game never had a released SDK; this is one, built from the
@@ -54,6 +54,11 @@ Format self tests (parse and rewrite every file, compare bytes):
     python3 formats/d6events.py --selftest /path/to/game
     python3 formats/d6mdlio.py --selftest /path/to/game     (rebuild every model)
     python3 formats/d6textio.py selftest /path/to/game     (tables as text and back)
+    python3 formats/d6npc.py --selftest /path/to/game      (NPC and guildmaster scripts)
+    python3 formats/d6efx.py --selftest /path/to/game      (emitters, effect sprites, spell table)
+    python3 formats/d6save.py --selftest /path/to/game     (save slots, ROSTER.DAT)
+    python3 formats/d6font.py --selftest /path/to/game     (fonts)
+    python3 formats/d6ui.py --selftest /path/to/game       (mouse pointers, DEEP6.PAL)
 
 Mod projects (details in `docs/mods.md`):
 
@@ -67,7 +72,10 @@ Command line tools: `formats/d6mdlio.py` (model export/import),
 `formats/d6tilegen.py` (terrain type tiles), `formats/d6icons.py` (item icons),
 `formats/d6exits.py` (list exits), `formats/d6walls.py` (walls/canopy),
 `formats/d6bspc.py` (compile TrenchBroom maps), `formats/d6npc.py` (NPC scripts),
-`formats/d6automap.py` (redraw automaps), `formats/d6mod.py` (mods).
+`formats/d6automap.py` (redraw automaps), `formats/d6mod.py` (mods),
+`formats/d6save.py` (save games: info, thumbnail, archive extract, edit
+fields such as `pc0.gold=5000`), `formats/d6font.py` (font sheets, render
+text), `formats/d6ui.py` (mouse pointers, palette swatch).
 
 Model preview from the command line:
 

@@ -28,6 +28,11 @@ format docs carry the details; this page is the overview.
 | Spoke change with BSP rebase (d6exits) | spoke 8 exit T3 (lever W1, party in box B2) to spoke 11 | PC moved by (157696, 13056, -34816) = origin 11/3 - origin 8/1 - (0, 256, 0), exactly as documented |
 | TrenchBroom 2026.2 editing | CRYPTA start corridor: wall retextured in the material browser, water volume (texture + content flag), light recoloured, new light from the entity browser; compile + install | skull wall, water surface and red light seen in the game (before/after screenshots); File > New template compiles |
 | TrenchBroom 2026.2 round trip | editor: set up project, decompile TCRYPT, open in TrenchBroom (AppImage), duplicate a roof beam 512 units up, save in TrenchBroom, compile + install from the editor | configuration loads (after fixes), map opens with the right game, compiled level contains the beam, game loads it; the beam itself not seen in the game (night, forest) |
+| Guildmaster buttons (Valeia Town Hall, Armory) | news, bank, employment (with its reply list), done/exit; buying in Smitty's armory | each runs its script handler (news text, "taking deposits", job offer, Bounty -> "The job is yours"); dagger bought, gold 200 -> 150, shop line spoken |
+| Lava and clip brushes (d6bspc) | CRYPTA start corridor: a lava pool (content flag lava, `_special/lava`) and a clip wall (`_special/clip`) added to the decompiled map, compiled, installed | lava compiles to leaf contents -5 and is drawn with the animated lava texture; the PC walks through it (no damage seen in 12 s; the party drifts out of the pool on its own); the clip wall is invisible and stops the PC at the brush face + 32 (hull 1) |
+| Animated effect textures (efxgfx `.ant`) | `torch-wood.ant` shade table with red and blue swapped | the wall torches burn blue |
+| Save editing (d6save) | game00.sav edited with `set`: name Redux, gold 5000, strength 25; loaded with --load-slot | loads; new name on the party panel; gold and strength in the character record in memory |
+| Unused database fields | hardware read watchpoints on the Crypt Skeleton record (+0x22, 0x26, 0x78, 0x8C, 0x8E, 0x11A, 0x120, 0x12C) and Rusted War Axe item +0x96 during melee | no reads: record fields are copied at spawn only, these not at all |
 | Party entry placement trig (d6exits) | save position against the formula | z 83453.9609375 matches the exe's sin/cos(i*6.28/1024) tables (2 pi gives 83456) |
 
 ## Checked against the retail data
@@ -37,18 +42,22 @@ format docs carry the details; this page is the overview.
 | Lightmap extents (smin, tmin, w, h) | all faces of crypta and minesb from the retail BSPs | 21743/21743 equal |
 | Light model | retail BSP + lights relit, every luxel against the retail .ls | RMS error 5.7 (crypta) and 4.0 (minesb, not used for the fit) of 30; old defaults 16 and 18 |
 | Vertex light / leaf object light | same, against the retail BSP lumps | own fit (ambient + 12.4, peak x 0.43): vertex RMS 7.1 / 8.5 (was 10.2), leaf light 4.4 / 7.1 |
+| Save slots and ROSTER.DAT (d6save) | parse and rebuild | byte identical |
+| Fonts (d6font), pointers + DEEP6.PAL (d6ui) | parse and rebuild all files | 51/51, 33/33 identical |
+| Vehicle BSPs (models/monster/*.bsp) | added to the d6level self test | 6/6 identical (end padding, empty-lump offset kept) |
 | `InBSPArea_` / spoke BSP lookup in d6exits | terrain leaf tree (TerBSP_Calculate_) ported; 39000 random positions (terrain and dungeon spokes) against the exe rules | 0 mismatches |
 
 ## Not yet checked in the game
 
 * Skinned glTF from a real Blender export.
-* Spell table numbers (mana, levels, recovery: needs a caster; the game maps
-  the patched exe, so the bytes arrive). The spellbook pages need magic skill.
+* Spell table numbers (mana, levels, recovery: needs a caster with magic
+  skill; the test warrior's Magic button does nothing. The game maps the
+  patched exe, so the bytes arrive).
 * Hearing sounds/music (the test setup has no audio device; file opens can
   be traced).
-* emitters.dat / .ant / .alf edits (the files are loaded at start, traced;
-  the look was not checked: no torch or candle near the test position).
-* Guildmaster buttons other than Leave (news, bank, shop results).
+* emitters.dat and .alf edits in the game (the files are loaded at start,
+  traced; `.ant` edits were checked, see above).
+* Lava damage (none seen; whether the engine hurts a party in lava is not known).
 * Rotating door pivot keys.
 
 ## Notes for testing

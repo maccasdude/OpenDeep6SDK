@@ -251,9 +251,12 @@ def selftest(root):
 
 
 if __name__ == '__main__':
-    root = sys.argv[1] if len(sys.argv) > 1 else '.'
+    args = [a for a in sys.argv[1:] if a not in ('--selftest', 'selftest')]
+    root = args[0] if args else '.'
     res, st = selftest(root)
     for k, (n, ok, bad) in res.items():
         print('%-34s %d/%d %s' % (k, ok, n, bad[:5]))
+    if '--selftest' in sys.argv or 'selftest' in sys.argv:
+        sys.exit(0 if all(ok == n for n, ok, _ in res.values()) else 1)
     for i, s in enumerate(st.spells):
         print(i, s.label, s.id, s.school, s.level, s.slot, s.recover_ms, s.mana, s.target, s.flags, s.category, s.animseq)

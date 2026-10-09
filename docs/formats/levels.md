@@ -71,6 +71,9 @@ again.
 
 Leaf contents (H, from `InBspWater_`): -1 empty, -2 solid, -3 water, -5 lava
 (-4 slime and -6 sky are Quake values not seen in use).
+`AdjustBspNavPnts_` flags nav points in water (0x04) and lava (0x04 | 0x02).
+Lava is not solid: in a test the PC walked through a lava pool without
+losing hit points, and the party moved out of it on its own (M).
 
 Texinfo (`bsp_3DCard_PolyDraw_`, `d_span.c`, `Texlist_AssignFaceTex_`):
 * Texture coordinate (H): `u = ((P - origin) . s.xyz + s.w * 0.25) / 32` gives

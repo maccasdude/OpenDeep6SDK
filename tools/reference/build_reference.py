@@ -29,6 +29,8 @@ CHAPTERS = [
     'formats/audio.md',
     'formats/npc.md',
     'formats/exits.md',
+    'formats/saves.md',
+    'formats/ui.md',
     'geometry.md',
 ]
 APPENDICES = ['exe_modules.md', 'verification.md']
@@ -101,7 +103,7 @@ def pdf(md, version):
 
 
 def main(argv):
-    version = 'v1.0.0'
+    version = 'v1.1.0'
     if '--version' in argv:
         version = argv[argv.index('--version') + 1]
     md = build(version)

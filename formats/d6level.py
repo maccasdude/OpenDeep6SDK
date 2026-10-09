@@ -218,6 +218,11 @@ class BSPFile(_Base):
         b.version = h[0]
         lumps = [(h[1 + 2 * i], h[2 + 2 * i]) for i in range(15)]
         b._offsets = lumps
+        # empty lumps with a non-zero offset (models/monster/*.bsp write the
+        # offset the lump would have had); kept so the file rebuilds byte for byte
+        b._empty_offsets = dict((i, o) for i, (o, n) in enumerate(lumps) if n == 0 and o)
+        end = max([o + n for o, n in lumps if n] or [124])
+        b._end_pad = bytes(data[end:])           # padding after the last lump (not always zero)
         nz = sorted((o, i) for i, (o, n) in enumerate(lumps) if n > 0)
         b._order = [i for _, i in nz] + [i for i in BSP_WRITE_ORDER if lumps[i][1] == 0]
         for i, (o, n) in enumerate(lumps):
@@ -268,8 +273,15 @@ class BSPFile(_Base):
                 out.append(0)
             hdr[i] = (len(out), len(lb))
             out += lb
+        end = len(out)
         while len(out) & 3:
             out.append(0)
+        pad = getattr(self, '_end_pad', b'')
+        if pad and len(pad) == len(out) - end:
+            out[end:] = pad
+        for i, o in getattr(self, '_empty_offsets', {}).items():
+            if hdr[i] == (0, 0):
+                hdr[i] = (o, 0)
         flat = [self.version]
         for o, n in hdr:
             flat += [o, n]
@@ -983,6 +995,11 @@ def selftest(gamedir):
                    if os.path.splitext(f)[1][1:].lower() in exts)
     extra = sorted(f for f in os.listdir(gamedir)
                    if re.match(r'(?i)^(d6link\d\d\.dat|spoke\d\d\.tol)$', f))
+    mdir = find_file(gamedir, 'models')
+    mon = os.path.join(mdir, 'monster') if mdir else None
+    if mon and os.path.isdir(mon):              # vehicle / collision BSPs (warship, raft, ...)
+        files += sorted(os.path.relpath(os.path.join(mon, f), gamedir) for f in os.listdir(mon)
+                        if f.lower().endswith('.bsp'))
     stats = {}
     fails = []
     for f in files + extra:

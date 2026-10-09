@@ -193,14 +193,19 @@ not see the edits.
 
 ## 5. Saves and runtime state
 
-* `save/` - the save slots (`game00.sav` ...). Their header resembles
-  `D6ARCHIV.DAT` (version 0x140) but was not decoded; the PC position is
-  stored twice (x, y, z floats; the second copy has y + 832).
+* `save/` - the save slots (`game00.sav` ...): a 0x54-byte header (version
+  0x140, part offsets), description, date, roster lines, a 136 x 111
+  thumbnail, two archives in the `D6ARCHIV.DAT` layout (the spoke cache and
+  the runtime state), the party state and one block per member (character
+  record, attachments, position, spell memory, monster state). Fully
+  decoded in `saves.md`; read, edited and rebuilt by `formats/d6save.py`
+  (an edited save was loaded in the game).
 * `D6ARCHIV.DAT` - archive of the whole runtime state (header of 173 u32:
   version, flags, offsets and sizes of `ROSTER`, `D6WORLD`, each
   `D6SEGnn.GAM`, the journals and 24 shop files). Decoded for listing and
   extraction (`data.md` section 7).
-* `D6WORLD.DAT` - world states; `ROSTER.DAT` - the party;
+* `D6WORLD.DAT` - world states; `ROSTER.DAT` - characters at the inn
+  (15 slots of the 0x27F8-byte character record, `saves.md` section 5);
   `D6SEGnn.GAM` - per-spoke objects (positions, health, opened chests).
 * Guildmaster flags are **not** saved: they reset on every visit.
 
@@ -321,10 +326,11 @@ Collected from the chapters (details there):
 
 * The `.ldl` files (launcher strings, XOR-encrypted, key not recovered; the
   game does not read them).
-* Save slot files (`save/game*.sav`): header not decoded.
-* Fonts (`.FNT`, `Font_Load_` font.c) and pointer files (`.ptr`, text, loaded
-  by `LoadPointers_` lmouse.c): loaders known, layouts not decoded.
-* A few database fields (`databases.md` section 11), terrain header floats
+* `Town000.hub` (not loaded by the exe; partial layout in `ui.md`).
+* Many fields of the 0x27F8-byte character record (`saves.md` section 6) and
+  parts of the save member block marked M there.
+* A few database fields (`databases.md` section 11; watchpoints show the
+  open monster fields are not read in the game), terrain header floats
   and some tile bytes (`terrain.md`), two NPC opcodes (`npc.md`), part
   header words in models (`models.md` section 5).
 * Effects hard-coded per spell id (damage, visuals and sounds are code, not
@@ -342,7 +348,7 @@ Collected from the chapters (details there):
 | `EVENTS.DCL`, `EVENTS.COD` | 2 | event script | data |
 | `NPCDATA.PAK`, `GMDATA.PAK` | 2 | dialogue bytecode | npc |
 | `D6STRING.DAT`, `TEXTPAK.000` | 2 | strings, messages | data |
-| `pctalk/TALKPAK.000-009` | 10 | PC remarks ("On my way...") per voice; same layout as TEXTPAK (u32 n, n x {i32 id, u32 offset, u32 size}, NUL strings) (H for layout) | this appendix |
+| `pctalk/TALKPAK.000-009` | 10 | PC remarks ("On my way...") per clan (record +0x1A); same layout as TEXTPAK (u32 n, n x {i32 id, u32 offset, u32 size}, NUL strings) | ui |
 | `*.bsp .twd .lf .lfs .ls .lss .lgt .rgb .nvs .l2n` | 66 each | indoor levels | levels |
 | `*.BOL` | 53 | objects per level | levels, data |
 | `.tc .pt1 .pt2` | 6 | tool output, not read | levels |
@@ -354,21 +360,21 @@ Collected from the chapters (details there):
 | `models/**/*.mdl` | 728 | models | models |
 | `models/pc/*.seq` | 33 | build-time frame lists for pcreduce.exe, not read by the game | models |
 | `models/*.lst`, `models/monster/model.lst` | 6 | model lists (only chardemo reads model.lst) | data, models |
-| `models/monster/*.bsp` | 6 | catapult, minecart, warship, raft, horse, hydra: not examined | - |
+| `models/monster/*.bsp` | 6 | version-28 BSPs; warship and raft are loaded by the exe (vehicle collision), the other four are not | ui |
 | `emitters.dat`, `efxgfx/*.ant .alf .p16 .bmp`, `gfx/` | | particles, animated textures, glows | effects |
 | `itemicon/`, `I99Icon/`, `dragicon/`, `roleicon/`, `portrait/` | | interface bitmaps (item icons: 246 in the exe table) | databases |
-| `D6FNT*.FNT` + `D6FNT*.P16` | 51 + 33 | fonts and their palettes (`Font_Load_`, `Font_LoadPal16_`) | not decoded |
+| `D6FNT*.FNT` + `D6FNT*.P16` | 51 + 33 | fonts and their palettes (`Font_Load_`, `Font_LoadPal16_`); 17 loaded | ui |
 | `palmdrop palmsand ptopdrop treedirt treedrop ttopdrop .p16` | 6 | backdrop palettes | terrain |
-| `*.ptr` + bitmaps | 32 | mouse pointers: text with the bitmap name, sizes, hot spot and per-frame "index time" lines (M) | not decoded |
-| `DEEP6.PAL` | 1 | 8960 bytes = 768-byte RGB palette + 8192 bytes (32 x 256) (M) | not decoded |
+| `*.ptr` + bitmaps | 32 | mouse pointers: text with the bitmap name, hot spot, frame size and per-step "frame time" lines; 23 loaded | ui |
+| `DEEP6.PAL` | 1 | 8960 bytes = 768-byte RGB palette + 8192-byte (32 x 256) table for the span routine | ui |
 | `MONSOUND.DAT`, `sounds/` | | sound effect table and wavs | audio |
 | `Speech/*/*.wav` | 5954 | spoken lines: NPCs, narrator (479 in 000-1611WAV), Gareth (27 in k21) | audio |
 | `music/*.mp3` | 8 | music (Miles MP3) | audio |
 | `speech.tag`, `music/MUSIC.TAG`, `Speech/SPEECH.DIR` | 3 | small text tag files (CD-era data location markers) (L) | - |
 | `JOURNAL.nnn` | | journal pages (runtime) | audio |
 | `townavi/townhubN.avi`, `townmskN.avi` | | town hub pans (MS Video 1) and click masks (uncompressed DIB) | terrain |
-| `Town000.hub` | 1 | not opened by deep6.exe (no file name string) | - |
+| `Town000.hub` | 1 | not opened by deep6.exe (no file name string) | ui |
 | `movie/*.bik` | 2 | Bink movies | - |
 | `*.ldl` | 4 | launcher strings, encrypted, not read by the game | data |
-| `D6ARCHIV.DAT`, `D6WORLD.DAT`, `ROSTER.DAT`, `D6SEGnn.GAM`, `PCSNAP.nnn`, `save/` | | runtime state (section 5) | data |
+| `D6ARCHIV.DAT`, `D6WORLD.DAT`, `ROSTER.DAT`, `D6SEGnn.GAM`, `PCSNAP.nnn`, `save/` | | runtime state (section 5) | data, saves |
 | `gameopt.dat`, `*.kbd` | | options, key bindings (runtime) | - |

@@ -36,7 +36,7 @@ Loader: `LoadItems_` (deep6.c) reads the u32 count (error if > 999) and then **a
 records into `_Item[1..count]` at startup. Display: `ItemBoxText_` (pcinvent.c) is the
 best single reference - it prints most fields with D6STRING format strings 2701..2813.
 
-An *inventory instance* (0x56 bytes, PC inventory at pc+0x296, 78 slots) is created by
+An *inventory instance* (0x56 bytes, PC inventory at pc+0x298, 78 slots) is created by
 `ItemToInv_` (townsmit.c) from the record: `+0 i16 item, +2 i16 durability (DiceRoll of
 durdice, or max for shop items), +4 u8 flags (1 ?, 2 cursed, 4 identified, 8 ?, 0x10
 invoked), +6 i32 charges/quantity, +0xA name, +0x20 spell, +0x22 damage[3], +0x2E
@@ -461,8 +461,13 @@ PCMLoadModel_ 0x4FBDDA..0x4FBE02, PCMChangeModel_ 0x4FC029..0x4FC051, PrintModel
 ## 11. Open questions / low confidence
 
 * Monster fields marked low (0x22, 0x26, 0x78, 0x8C, 0x11A, 0x120, 0x12C) have values in
-  the data but no reader was found in the decompile (they may be editor-only or read
-  through the copied runtime struct).
+  the data but no reader was found in the decompile. `InitMONSToMonster_` reads the
+  record only at 0x18, 0x28, 0x2C (16 bytes), 0x34, 0x4C (32 bytes), 0x68, 0x7A, 0x7C,
+  0x7E, 0x9C, 0xFC, 0x128, 0x131, 0x132. Hardware read watchpoints on the Crypt
+  Skeleton record in the running game (two runs, about 45 s of melee each) saw no
+  read of any of these fields, nor of item field 0x96 on the Rusted War Axe record.
+  They are most likely editor-only data (medium confidence): changing them should
+  have no effect in the game.
 * Exact meaning of several flag bits (MonsRec flags130/131/132, ItemRec atkflags/
   atkflags2, flags98 0x0080/0x4000/0x8000) is inferred from the tests and the records
   that set them.
